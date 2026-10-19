@@ -2,44 +2,206 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Crew Department Planner</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 20px;
-      background: #f4f6f9;
-      color: #1f2937;
-    }
-    h1 { color: #17436b; }
-    .card {
-      background: white;
-      padding: 20px;
-      margin: 12px 0;
-      border-radius: 10px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crew Department Planner</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  max-width: 1000px;
+  margin: 30px auto;
+  padding: 20px;
+  background: #f3f6fa;
+  color: #203044;
+}
+h1 { color: #17436b; }
+.card {
+  background: white;
+  padding: 20px;
+  margin: 15px 0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px #00000010;
+}
+input, select, button {
+  padding: 10px;
+  margin: 5px 0;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid #ccd4df;
+}
+input, select { width: 100%; }
+button {
+  background: #17436b;
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+button:hover { opacity: .85; }
+.task {
+  border-bottom: 1px solid #ddd;
+  padding: 12px 0;
+}
+.task:last-child { border-bottom: none; }
+.small { color: #5c6878; font-size: 14px; }
+.done { color: #16804a; }
+.overdue { color: #c0392b; }
+</style>
 </head>
 <body>
-  <h1>Crew Department Planner</h1>
-  <p>Department task monitoring dashboard</p>
 
-  <div class="card">
-    <h2>Task Planning</h2>
-    <p>Plan activities and assign responsibilities.</p>
-  </div>
+<h1>Crew Department Planner</h1>
+<p>Department task planning and follow-up dashboard</p>
 
-  <div class="card">
-    <h2>Pending Follow-ups</h2>
-    <p>Monitor outstanding tasks and deadlines.</p>
-  </div>
+<div class="card">
+  <h2>Dashboard</h2>
+  <p id="summary">Loading tasks...</p>
+</div>
 
-  <div class="card">
-    <h2>Department Overview</h2>
-    <p>Your shared planning workspace starts here.</p>
-  </div>
+<div class="card">
+  <h2>Add New Task</h2>
+  <form id="taskForm">
+    <label>Task description</label>
+    <input id="taskName" required
+      placeholder="e.g. Follow up on crew change">
+
+    <label>Vessel</label>
+    <input id="vessel" placeholder="e.g. Gas Winner">
+
+    <label>Assigned to</label>
+    <input id="owner" required
+      placeholder="Staff member">
+
+    <label>Due date</label>
+    <input id="dueDate" type="date" required>
+
+    <label>Priority</label>
+    <select id="priority">
+      <option>Normal</option>
+      <option>High</option>
+      <option>Urgent</option>
+    </select>
+
+    <button type="submit">Add Task</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Task Tracker</h2>
+  <label>Filter tasks</label>
+  <select id="filter" onchange="renderTasks()">
+    <option value="All">All tasks</option>
+    <option value="Pending">Pending</option>
+    <option value="In Progress">In Progress</option>
+    <option value="Completed">Completed</option>
+  </select>
+  <div id="taskList"></div>
+</div>
+
+<script>
+let tasks = JSON.parse(
+  localStorage.getItem("crewTasks") || "[]"
+);
+
+function saveTasks() {
+  localStorage.setItem("crewTasks", JSON.stringify(tasks));
+}
+
+function renderTasks() {
+  const filter = document.getElementById("filter").value;
+  const list = document.getElementById("taskList");
+
+  const pending = tasks.filter(t => t.status === "Pending").length;
+  const progress = tasks.filter(t => t.status === "In Progress").length;
+  const completed = tasks.filter(t => t.status === "Completed").length;
+
+  document.getElementById("summary").textContent =
+    `Total: ${tasks.length} | Pending: ${pending} | ` +
+    `In progress: ${progress} | Completed: ${completed}`;
+
+  list.innerHTML = "";
+
+  tasks.forEach((task, index) => {
+    if (filter !== "All" && task.status !== filter) return;
+
+    const item = document.createElement("div");
+    item.className = "task";
+
+    const heading = document.createElement("strong");
+    heading.textContent = task.name;
+    item.appendChild(heading);
+
+    const details = document.createElement("p");
+    details.className = "small";
+    details.textContent =
+      `Vessel: ${task.vessel || "Not specified"} | ` +
+      `Assigned: ${task.owner} | Due: ${task.due} | ` +
+      `Priority: ${task.priority}`;
+    item.appendChild(details);
+
+    if (task.status !== "Completed" &&
+        task.due < new Date().toLocaleDateString("en-CA")) {
+      const warning = document.createElement("p");
+      warning.className = "overdue";
+      warning.textContent = "Overdue";
+      item.appendChild(warning);
+    }
+
+    const status = document.createElement("select");
+    ["Pending", "In Progress", "Completed"].forEach(value => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      option.selected = task.status === value;
+      status.appendChild(option);
+    });
+
+    status.addEventListener("change", () => {
+      tasks[index].status = status.value;
+      saveTasks();
+      renderTasks();
+    });
+    item.appendChild(status);
+
+    const remove = document.createElement("button");
+    remove.textContent = "Delete Task";
+    remove.style.marginLeft = "8px";
+    remove.addEventListener("click", () => {
+      if (confirm("Delete this task?")) {
+        tasks.splice(index, 1);
+        saveTasks();
+        renderTasks();
+      }
+    });
+    item.appendChild(remove);
+
+    list.appendChild(item);
+  });
+
+  if (list.innerHTML === "") {
+    list.textContent = "No tasks to display.";
+  }
+}
+
+document.getElementById("taskForm").addEventListener(
+  "submit", function(event) {
+    event.preventDefault();
+
+    tasks.push({
+      name: document.getElementById("taskName").value.trim(),
+      vessel: document.getElementById("vessel").value.trim(),
+      owner: document.getElementById("owner").value.trim(),
+      due: document.getElementById("dueDate").value,
+      priority: document.getElementById("priority").value,
+      status: "Pending"
+    });
+
+    saveTasks();
+    this.reset();
+    renderTasks();
+  }
+);
+
+renderTasks();
+</script>
 </body>
 </html>
